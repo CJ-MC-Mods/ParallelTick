@@ -9,8 +9,6 @@ import java.lang.ref.WeakReference;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.concurrent.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class TickExecutor {
 
@@ -37,21 +35,29 @@ public class TickExecutor {
         setupQueues();
 
         createExecutor();
-        ForkJoinTask<Stream<WeakReference<ParallelInternalTick>>> temp = pool.submit(() -> internalCurrent.parallelStream().filter(wr -> {
+
+        ForkJoinTask temp = pool.submit(() -> internalCurrent.parallelStream().forEach(wr -> {
             ParallelInternalTick runnable = wr.get();
-            return runnable != null && runnable.internalTick();
+            if(runnable != null && runnable.internalTick()) {
+                this.addToInternalTick(wr);
+            }
         }));
 
         try {
-            Stream<WeakReference<ParallelInternalTick>> result = temp.get();
-            internalCurrent.addAll(result.collect(Collectors.toList()));
+            Object result = temp.get();
         } catch (InterruptedException | ExecutionException  e) {
             e.printStackTrace();
         }
     }
 
-    public void addToInteralTick(@Nonnull ParallelInternalTick task){
-        internalTick.add(new WeakReference<>(task));
+    public void addToInternalTick(@Nonnull ParallelInternalTick task){
+        addToInternalTick(new WeakReference<>(task));
+    }
+
+    private void addToInternalTick(@Nonnull WeakReference<ParallelInternalTick> wrTask) {
+        synchronized (internalTick) {
+            internalTick.add(wrTask);
+        }
     }
 
     private void createExecutor() {
