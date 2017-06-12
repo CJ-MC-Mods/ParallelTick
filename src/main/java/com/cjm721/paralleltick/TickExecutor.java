@@ -6,6 +6,7 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 import javax.annotation.Nonnull;
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.concurrent.*;
@@ -21,10 +22,11 @@ public class TickExecutor {
     public TickExecutor() {
         INSTANCE = this;
         setupQueues();
+        createExecutor();
     }
 
     private void setupQueues() {
-        internalTick = new LinkedList<>();
+        internalTick = new ArrayList<>();
     }
 
     @SubscribeEvent
@@ -34,17 +36,16 @@ public class TickExecutor {
         Collection<WeakReference<ParallelInternalTick>> internalCurrent = internalTick;
         setupQueues();
 
-        createExecutor();
-
         ForkJoinTask temp = pool.submit(() -> internalCurrent.parallelStream().forEach(wr -> {
             ParallelInternalTick runnable = wr.get();
             if(runnable != null && runnable.internalTick()) {
+//              System.out.println(Thread.currentThread().getName());
                 this.addToInternalTick(wr);
             }
         }));
 
         try {
-            Object result = temp.get();
+            temp.get();
         } catch (InterruptedException | ExecutionException  e) {
             e.printStackTrace();
         }
